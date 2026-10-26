@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="340" viewBox="0 0 720 340" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#222">
+<rect width="720" height="340" fill="#fff"/>
+<text x="30" y="28" font-size="15">Cascata de perdas do OEE, base sintética (OEE = F/B = 90,0%)</text>
+<line x1="30" y1="290" x2="710" y2="290" stroke="#333"/>
+<rect x="53" y="65" width="68" height="225" fill="#2f5d8a"/>
+<text x="87" y="58" text-anchor="middle">76.944 h</text>
+<text x="87" y="308" text-anchor="middle">Disponível</text>
+<text x="87" y="323" text-anchor="middle">(B)</text>
+<rect x="166" y="65" width="68" height="96" fill="#c8553d"/>
+<text x="200" y="58" text-anchor="middle">-4.948 h</text>
+<text x="200" y="308" text-anchor="middle">Parada</text>
+<text x="200" y="323" text-anchor="middle">(A1)</text>
+<rect x="279" y="143" width="68" height="18" fill="#3f9c6e"/>
+<text x="313" y="136" text-anchor="middle">+935 h</text>
+<text x="313" y="308" text-anchor="middle">Ritmo acima</text>
+<text x="313" y="323" text-anchor="middle">do padrão</text>
+<rect x="393" y="143" width="68" height="52" fill="#c8553d"/>
+<text x="427" y="136" text-anchor="middle">-2.681 h</text>
+<text x="427" y="308" text-anchor="middle">Cavidade</text>
+<text x="427" y="323" text-anchor="middle">isolada</text>
+<rect x="506" y="196" width="68" height="20" fill="#c8553d"/>
+<text x="540" y="189" text-anchor="middle">-1.027 h</text>
+<text x="540" y="308" text-anchor="middle">Refugo</text>
+<text x="540" y="323" text-anchor="middle">em tempo</text>
+<rect x="619" y="216" width="68" height="74" fill="#2f5d8a"/>
+<text x="653" y="209" text-anchor="middle">69.222 h</text>
+<text x="653" y="308" text-anchor="middle">Produtivo</text>
+<text x="653" y="323" text-anchor="middle">(F)</text>
+</svg>
