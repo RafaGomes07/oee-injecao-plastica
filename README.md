@@ -4,7 +4,7 @@ Modelo de OEE para uma planta de injeção plástica, construído em Power BI, q
 
 > Os dados deste repositório são **sintéticos**, gerados por `scripts/gerar_dados_sinteticos.py`. A lógica, as medidas DAX e o modelo vêm de um projeto real, com nomes, volumes e índices trocados.
 
-![Cascata de perdas do OEE](docs/cascata-perdas.png)
+![Cascata de perdas do OEE](docs/cascata-perdas.svg)
 
 ## O problema
 
@@ -58,7 +58,7 @@ scripts/    geração da base, validação das identidades e gráfico da cascata
 pip install -r requirements.txt
 python scripts/gerar_dados_sinteticos.py   # cria os CSVs em dados/
 python scripts/validar_oee.py              # confere as identidades e mostra as distorções
-python scripts/grafico_cascata.py          # gera docs/cascata-perdas.png
+python scripts/grafico_cascata.py          # gera docs/cascata-perdas.svg
 ```
 
 Saída da validação na base sintética:
