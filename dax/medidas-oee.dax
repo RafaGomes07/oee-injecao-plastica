@@ -1,0 +1,174 @@
+// =============================================================================
+// Medidas de OEE - composição em TEMPO
+// Tabela de medidas: MEDIDAS_OEE    Fato principal: fInjet_Consolidado
+//
+// Letras dos agregados (ver docs/memorial-de-calculo.md):
+//   B  Disponíveis   = C + A1
+//   C  Trabalhadas   = tempo de ciclo apontado
+//   E  Produzido     = teórico - cavidade isolada
+//   F  Produtivas    = E - refugo em tempo
+//   OEE = F / B = (C/B) x (E/C) x (F/E)
+// =============================================================================
+
+
+// ---------- Agregados de tempo (horas) ----------------------------------------
+
+// C - Trabalhadas
+MEASURE MEDIDAS_OEE[Horas_Trab_Total] =
+    SUM ( fInjet_Consolidado[Horas_Trab] )
+
+// A1 - Paradas DENTRO do tempo ativo. Não somar com a parada apontada pelo
+// operador (fInjet_Paradas): ela conta duração de calendário e dá ~3x mais.
+MEASURE MEDIDAS_OEE[Horas_Paradas_Total] =
+    SUM ( fInjet_Consolidado[Horas_Paradas] )
+
+// B - Disponíveis. O consolidado não tem coluna de tempo ativo: ele é C + A1.
+MEASURE MEDIDAS_OEE[Tempo_Ativo_Total] =
+    [Horas_Trab_Total] + [Horas_Paradas_Total]
+
+// Tempo teórico = injeções x ciclo padrão, antes de descontar cavidade.
+MEASURE MEDIDAS_OEE[Hrs_Teorico_Total] =
+    SUM ( fInjet_Consolidado[Hrs_Teorico] )
+
+// Tempo teórico perdido em cavidade bloqueada. Pertence ao DESEMPENHO, não à
+// qualidade: somar cavidade ao refugo desconta a mesma perda duas vezes.
+MEASURE MEDIDAS_OEE[Hrs_Cav_Isolada] =
+    SUMX (
+        fInjet_Consolidado,
+        fInjet_Consolidado[Hrs_Teorico]
+            * ( 1 - DIVIDE ( fInjet_Consolidado[Cav_Ativas], fInjet_Consolidado[Cav_Total], 1 ) )
+    )
+
+// E - Total produzido
+MEASURE MEDIDAS_OEE[Hrs_Produzido] =
+    [Hrs_Teorico_Total] - [Hrs_Cav_Isolada]
+
+// A4 - Refugo convertido em tempo. Pondera por Horas_Trab porque o refugo
+// consumiu tempo REAL de máquina: molde de ciclo lento gasta mais tempo por peça.
+MEASURE MEDIDAS_OEE[Hrs_Refugo] =
+    SUMX (
+        fInjet_Consolidado,
+        fInjet_Consolidado[Horas_Trab]
+            * DIVIDE ( fInjet_Consolidado[Pecas_Ref], fInjet_Consolidado[Pecas_Prod], 0 )
+    )
+
+// F - Produtivas (numerador do OEE)
+MEASURE MEDIDAS_OEE[Hrs_Produtivo] =
+    [Hrs_Produzido] - [Hrs_Refugo]
+
+// A5 - Ritmo, com sinal de degrau de cascata: positivo quando a máquina roda
+// mais rápido que o ciclo cadastrado.
+MEASURE MEDIDAS_OEE[Hrs_Ritmo] =
+    [Hrs_Teorico_Total] - [Horas_Trab_Total]
+
+
+// ---------- Índices -----------------------------------------------------------
+
+// C / B
+MEASURE MEDIDAS_OEE[Disponibilidade %] =
+    DIVIDE ( [Horas_Trab_Total], [Tempo_Ativo_Total] )
+
+// E / C. Passa de 100% quando a máquina roda acima do ciclo padrão.
+MEASURE MEDIDAS_OEE[Desempenho %] =
+    DIVIDE ( [Hrs_Produzido], [Horas_Trab_Total] )
+
+// F / E, em tempo. Não usar Pecas_Boas / Pecas_Prod: não fecha com o MES.
+MEASURE MEDIDAS_OEE[Qualidade %] =
+    DIVIDE ( [Hrs_Produtivo], [Hrs_Produzido] )
+
+// F / B. Fecha por construção com Disponibilidade x Desempenho x Qualidade.
+MEASURE MEDIDAS_OEE[OEE %] =
+    DIVIDE ( [Hrs_Produtivo], [Tempo_Ativo_Total] )
+
+// Eficiência pura de ciclo, sem desconto de cavidade. Acima de 100% de forma
+// persistente indica ficha técnica desatualizada.
+MEASURE MEDIDAS_OEE[Efic_Ciclo %] =
+    DIVIDE ( [Hrs_Teorico_Total], [Horas_Trab_Total] )
+
+// Refugo em PEÇA. Não é o complemento da Qualidade %, que é em tempo.
+MEASURE MEDIDAS_OEE[Ind_Refugo %] =
+    DIVIDE ( SUM ( fInjet_Consolidado[Pecas_Ref] ), SUM ( fInjet_Consolidado[Pecas_Prod] ) )
+
+MEASURE MEDIDAS_OEE[Ind_Cav_Ativas %] =
+    DIVIDE (
+        SUMX ( fInjet_Consolidado, fInjet_Consolidado[Cav_Ativas] * fInjet_Consolidado[Horas_Trab] ),
+        SUMX ( fInjet_Consolidado, fInjet_Consolidado[Cav_Total] * fInjet_Consolidado[Horas_Trab] )
+    )
+
+
+// ---------- Comparação e diagnóstico por máquina ------------------------------
+
+// OEE da planta/período ignorando o filtro de máquina: régua de cada linha.
+MEASURE MEDIDAS_OEE[OEE % Referência] =
+    CALCULATE ( [OEE %], ALL ( dMaquina ) )
+
+MEASURE MEDIDAS_OEE[Status_Maquina] =
+    VAR OeeMaq = [OEE %]
+    VAR OeeRef = [OEE % Referência]
+    RETURN
+        SWITCH (
+            TRUE (),
+            OeeMaq >= OeeRef, "Na meta",
+            OeeMaq >= OeeRef - 0.05, "Atenção",
+            "Crítico"
+        )
+
+// Horas produtivas que a máquina deixou de entregar contra a referência.
+MEASURE MEDIDAS_OEE[Impacto_OEE_h] =
+    [Tempo_Ativo_Total] * [OEE % Referência] - [Hrs_Produtivo]
+
+MEASURE MEDIDAS_OEE[OEE % Mês Anterior] =
+    CALCULATE ( [OEE %], DATEADD ( dCalendario[Date], -1, MONTH ) )
+
+MEASURE MEDIDAS_OEE[OEE % Todos os Turnos] =
+    CALCULATE ( [OEE %], ALL ( dTurno ) )
+
+// Tonelagem lida do prefixo do código da injetora ("250/03A" -> 250 t).
+MEASURE MEDIDAS_OEE[Tonelagem_Maquina] =
+    VAR N = SELECTEDVALUE ( dMaquina[Maquina] )
+    VAR P = IFERROR ( SEARCH ( "/", N ) - 1, LEN ( N ) )
+    RETURN
+        IF ( NOT ISBLANK ( N ), LEFT ( N, P ) & " t" )
+
+
+// ---------- Paradas apontadas (Pareto, MTBF, MTTR) ----------------------------
+// A duração apontada serve para análise de MOTIVO, nunca para o índice do OEE.
+
+MEASURE MEDIDAS_OEE[Horas_Paradas_Apontadas] =
+    SUM ( fInjet_Paradas[Duracao_Min] ) / 60
+
+MEASURE MEDIDAS_OEE[Eventos_Paradas] =
+    SUM ( fInjet_Paradas[Eventos] )
+
+MEASURE MEDIDAS_OEE[MTBF_h] =
+    DIVIDE ( [Horas_Trab_Total], [Eventos_Paradas] )
+
+MEASURE MEDIDAS_OEE[MTTR_min] =
+    DIVIDE ( [Horas_Paradas_Apontadas], [Eventos_Paradas] ) * 60
+
+MEASURE MEDIDAS_OEE[Rank_Area] =
+    RANKX ( ALLSELECTED ( fInjet_Paradas[Area] ), [Horas_Paradas_Apontadas], , DESC, DENSE )
+
+MEASURE MEDIDAS_OEE[Acumulado %] =
+    VAR RankAtual = [Rank_Area]
+    VAR Total = CALCULATE ( [Horas_Paradas_Apontadas], ALLSELECTED ( fInjet_Paradas[Area] ) )
+    RETURN
+        DIVIDE (
+            SUMX (
+                FILTER ( ALLSELECTED ( fInjet_Paradas[Area] ), [Rank_Area] <= RankAtual ),
+                [Horas_Paradas_Apontadas]
+            ),
+            Total
+        )
+
+// Impacto da área de parada no OEE da máquina, em pontos percentuais.
+// Usa a parada apontada só como PROPORÇÃO; o peso vem da A1 oficial.
+// Guarda: máquina que não trabalhou no recorte não tem OEE a perder.
+MEASURE MEDIDAS_OEE[Impacto_Area_pp] =
+    VAR FracArea =
+        DIVIDE (
+            [Horas_Paradas_Apontadas],
+            CALCULATE ( [Horas_Paradas_Apontadas], ALL ( fInjet_Paradas[Area], fInjet_Paradas[Motivo] ) )
+        )
+    RETURN
+        IF ( [Horas_Trab_Total] > 0, FracArea * DIVIDE ( [Horas_Paradas_Total], [Tempo_Ativo_Total] ) )
